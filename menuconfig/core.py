@@ -818,15 +818,15 @@ def _needs_save():
         return True
 
     for sym in _kconf.unique_defined_syms:
-        # symbol not loaded from sdkconfig
-        if sym._sdkconfig_value is None:
+        # symbol not loaded from tyconfig
+        if sym._tyconfig_value is None:
             if sym.config_string:
                 # Unwritten symbol
                 return True
         # symbol changed value during menuconfig session for whatever reason
-        elif sym.str_value != sym._sdkconfig_value:
+        elif sym.str_value != sym._tyconfig_value:
             return True
-        # symbol loaded from sdkconfig having the same value
+        # symbol loaded from tyconfig having the same value
         # May still need to save changed (non-)default state
         else:
             # symbol set back to default value

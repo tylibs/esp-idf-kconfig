@@ -10,7 +10,7 @@ import textwrap
 import unittest
 
 from kconfiglib import POLICY_USE_KCONFIG
-from kconfiglib import POLICY_USE_SDKCONFIG
+from kconfiglib import POLICY_USE_TYCONFIG
 
 
 class KconfgenBaseTestCase(unittest.TestCase):
@@ -230,9 +230,9 @@ class RenameConfigTestCase(KconfgenBaseTestCase):
         # provide the new name for `CONFIG_NAMED_OPTION` we defined above
         with tempfile.NamedTemporaryFile(mode="w+", prefix="test_kconfgen_", delete=False) as f:
             self.addCleanup(os.remove, f.name)
-            # Same as above, the following entry will result in the generation of `--sdkconfig-rename`
+            # Same as above, the following entry will result in the generation of `--tyconfig-rename`
             # parameter followed by the current temporary file name.
-            self.args.update({"sdkconfig-rename": f.name})
+            self.args.update({"tyconfig-rename": f.name})
             # The content of our `rename` file is simple: replace `CONFIG_NAMED_OPTION` by `CONFIG_RENAMED_OPTION`
             f.write(text)
             return f.name
@@ -248,7 +248,7 @@ class RenameConfigTestCase(KconfgenBaseTestCase):
 
     def testRenamedOptionDisabled(self):
         # Setup the test. What we want to do is to have a configuration file containing which
-        # option should be enabled or not, this is the equivalent of the `sdkconfig` that we can find
+        # option should be enabled or not, this is the equivalent of the `tyconfig` that we can find
         # in the examples.
 
         rename_text = textwrap.dedent(
@@ -258,13 +258,13 @@ class RenameConfigTestCase(KconfgenBaseTestCase):
         )
         self.prepare_rename_file(rename_text)
 
-        sdkconfig_text = textwrap.dedent(
+        tyconfig_text = textwrap.dedent(
             """
             # CONFIG_NAMED_OPTION is not set
             """
         )
-        self.prepare_sdkconifg_file(sdkconfig_text)
-        # Invoke the unit test, specify that the final `sdkconfig` generated must contain the string:
+        self.prepare_sdkconifg_file(tyconfig_text)
+        # Invoke the unit test, specify that the final `tyconfig` generated must contain the string:
         # "# CONFIG_RENAMED_OPTION is not set"
 
         self.invoke_and_test(self.input, "# CONFIG_RENAMED_OPTION is not set")
@@ -277,12 +277,12 @@ class RenameConfigTestCase(KconfgenBaseTestCase):
         )
         self.prepare_rename_file(rename_text)
 
-        sdkconfig_text = textwrap.dedent(
+        tyconfig_text = textwrap.dedent(
             """
             # CONFIG_NAMED_OPTION is not set
             """
         )
-        self.prepare_sdkconifg_file(sdkconfig_text)
+        self.prepare_sdkconifg_file(tyconfig_text)
         self.invoke_and_test(self.input, "CONFIG_RENAMED_OPTION=y")
 
     def testForbiddenRenaming(self):
@@ -549,7 +549,7 @@ class ChooseDefaultValueTestCase(KconfgenBaseTestCase):
     def setUpClass(self):
         super(ChooseDefaultValueTestCase, self).setUpClass()
         self.args.update({"output": "config"})
-        self.sdkconfig_file = "sdkconfig"
+        self.tyconfig_file = "tyconfig"
         self.input = textwrap.dedent(
             """
             mainmenu "Test Choose Default Value"
@@ -560,25 +560,25 @@ class ChooseDefaultValueTestCase(KconfgenBaseTestCase):
 
             """
         )
-        with open(self.sdkconfig_file, "w") as sdkconfig:
-            sdkconfig.write("# default:\n")
-            sdkconfig.write("CONFIG_FOO=n\n")
-            self.args.update({"config": self.sdkconfig_file})  # this is input in contrast with {'output': 'config'}
+        with open(self.tyconfig_file, "w") as tyconfig:
+            tyconfig.write("# default:\n")
+            tyconfig.write("CONFIG_FOO=n\n")
+            self.args.update({"config": self.tyconfig_file})  # this is input in contrast with {'output': 'config'}
 
     @classmethod
     def tearDownClass(self):
         try:
-            os.remove(self.sdkconfig_file)
+            os.remove(self.tyconfig_file)
         except FileNotFoundError:
             pass
 
     def testDefault(self):
-        self.args.update({"env": f"KCONFIG_DEFAULTS_POLICY={POLICY_USE_SDKCONFIG}"})
+        self.args.update({"env": f"KCONFIG_DEFAULTS_POLICY={POLICY_USE_TYCONFIG}"})
         self.invoke_and_test(self.input, "# CONFIG_FOO is not set")
         with open(self.output_file, "r") as f:
             self.assertIn("# CONFIG_FOO is not set\n", f.readlines())
 
-    def testIgnoreSdkconfig(self):
+    def testIgnoreTyconfig(self):
         self.args.update({"env": f"KCONFIG_DEFAULTS_POLICY={POLICY_USE_KCONFIG}"})
         self.invoke_and_test(self.input, "CONFIG_FOO=y")
         with open(self.output_file, "r") as f:

@@ -47,7 +47,9 @@ class InputError(RuntimeError):
     """
 
     def __init__(self, path, line_number, error_msg, suggested_line):
-        super(InputError, self).__init__("{}:{}: {}".format(path, line_number, error_msg))
+        super(InputError, self).__init__(
+            "{}:{}: {}".format(path, line_number, error_msg)
+        )
         self.suggested_line = suggested_line
 
 
@@ -69,7 +71,9 @@ class BaseChecker(object):
         """
         Abstract method for processing a line
         """
-        raise NotImplementedError("process_line method is not implemented in BaseChecker")
+        raise NotImplementedError(
+            "process_line method is not implemented in BaseChecker"
+        )
 
 
 class SourceChecker(BaseChecker):
@@ -98,7 +102,9 @@ class SourceChecker(BaseChecker):
                     self.path_in_idf,
                     line_number,
                     "only filenames starting with Kconfig.* can be sourced",
-                    line.replace(path, os.path.join(os.path.dirname(path), "Kconfig." + filename)),
+                    line.replace(
+                        path, os.path.join(os.path.dirname(path), "Kconfig." + filename)
+                    ),
                 )
 
 
@@ -168,7 +174,9 @@ class ConfigNameChecker(BaseChecker):
     def process_line(self, line: str, line_number: int) -> None:
         raise NotImplementedError("ConfigNameChecker checks config names, not lines.")
 
-    def process_config_name(self, config_name: str, line: str, line_number: int) -> None:
+    def process_config_name(
+        self, config_name: str, line: str, line_number: int
+    ) -> None:
         for rule in (self.rule_prefix, self.rule_uppercase, self.rule_name_len):
             rule(config_name, line, line_number)
 
@@ -265,8 +273,12 @@ class IndentAndNameChecker(BaseChecker):
         # the last two categories can contain anything between the quotes, thus it is broader.
         symbol = r"\w+|\".+?\"|'.+?'"
         reg_prompt = re.compile(r"^\".*?\"\s+(?:if)\s+(?P<expression0>.*)$")
-        reg_default = re.compile(r"^(?P<expression0>.*)\s+(?:if)\s+(?P<expression1>.*)$")
-        reg_select_imply = re.compile(rf"^(?P<expression0>{symbol})\s+(?:if)\s+(?P<expression1>.*)$")
+        reg_default = re.compile(
+            r"^(?P<expression0>.*)\s+(?:if)\s+(?P<expression1>.*)$"
+        )
+        reg_select_imply = re.compile(
+            rf"^(?P<expression0>{symbol})\s+(?:if)\s+(?P<expression1>.*)$"
+        )
         reg_range = re.compile(
             rf"^(?P<expression0>{symbol})\s+(?P<expression1>{symbol})\s+(?:if)\s+(?P<expression2>.*)$"
         )
@@ -296,7 +308,9 @@ class IndentAndNameChecker(BaseChecker):
         if len(self.prefix_stack) != 0:
             if self.debug:
                 print(self.prefix_stack)
-            raise RuntimeError("Prefix stack should be empty. Perhaps a menu/choice hasn't been closed")
+            raise RuntimeError(
+                "Prefix stack should be empty. Perhaps a menu/choice hasn't been closed"
+            )
 
     def del_from_level_stack(self, count):
         """delete count items from the end of the level_stack"""
@@ -362,7 +376,9 @@ class IndentAndNameChecker(BaseChecker):
         line_with_symbols = self.reg_switch.match(line)
 
         if line_with_symbols:
-            expressions = self.kw_to_regex[line_with_symbols.group("keyword")].match(line_with_symbols.group("body"))
+            expressions = self.kw_to_regex[line_with_symbols.group("keyword")].match(
+                line_with_symbols.group("body")
+            )
             if expressions:
                 for k in expressions.groupdict().keys():
                     symbols = self.reg_symbol.findall(expressions.groupdict()[k])
@@ -400,7 +416,9 @@ class IndentAndNameChecker(BaseChecker):
                 self.prefix_stack[-1] = name
             else:
                 # this has nothing common with paths but the algorithm can be used for this also
-                self.prefix_stack[-1] = os.path.commonprefix([self.prefix_stack[-1], name])
+                self.prefix_stack[-1] = os.path.commonprefix(
+                    [self.prefix_stack[-1], name]
+                )
             if self.debug:
                 print("prefix+", self.prefix_stack)
         m = self.re_new_stack.search(line)
@@ -472,7 +490,9 @@ class IndentAndNameChecker(BaseChecker):
                 raise InputError(
                     self.path_in_idf,
                     line_number,
-                    "Indentation consists of {} spaces instead of {}".format(current_indent, self.force_next_indent),
+                    "Indentation consists of {} spaces instead of {}".format(
+                        current_indent, self.force_next_indent
+                    ),
                     (" " * self.force_next_indent) + line.lstrip(),
                 )
             else:
@@ -480,7 +500,9 @@ class IndentAndNameChecker(BaseChecker):
                     self.force_next_indent = 0
                 return
 
-        elif stripped_line.endswith("\\") and stripped_line.startswith(("config", "menuconfig", "choice")):
+        elif stripped_line.endswith("\\") and stripped_line.startswith(
+            ("config", "menuconfig", "choice")
+        ):
             raise InputError(
                 self.path_in_idf,
                 line_number,
@@ -517,14 +539,16 @@ class IndentAndNameChecker(BaseChecker):
             raise InputError(
                 self.path_in_idf,
                 line_number,
-                "Indentation consists of {} spaces instead of {}".format(current_indent, expected_indent),
+                "Indentation consists of {} spaces instead of {}".format(
+                    current_indent, expected_indent
+                ),
                 (" " * expected_indent) + line.lstrip(),
             )
 
 
 class SDKRenameChecker(BaseChecker):
     """
-    Checks sdkconfig.rename[.target] files:
+    Checks tyconfig.rename[.target] files:
     * if the line contains at least two tokens (old and new config name pairs)
     * if the inversion syntax is used correctly
     """
@@ -557,7 +581,7 @@ class SDKRenameChecker(BaseChecker):
             inversion = True
 
         ############################################
-        # sdkconfig.rename specific checks
+        # tyconfig.rename specific checks
         ############################################
         # Check inversion syntax
         if old_name.startswith("!"):
@@ -611,19 +635,23 @@ def valid_directory(path):
     return path
 
 
-def validate_file(file_full_path: str, verbose: bool = False, replace: bool = False) -> bool:
+def validate_file(
+    file_full_path: str, verbose: bool = False, replace: bool = False
+) -> bool:
     # Even in case of in_place modification, create a new file with suggestions (original will be replaced later).
     suggestions_full_path = file_full_path + OUTPUT_SUFFIX
     fail = False
     checkers: Tuple[BaseChecker, ...] = tuple()
     if "Kconfig" in os.path.basename(file_full_path):
         checkers = (
-            IndentAndNameChecker(file_full_path),  # indent checker has to be before line checker, otherwise
+            IndentAndNameChecker(
+                file_full_path
+            ),  # indent checker has to be before line checker, otherwise
             # false-positive indent error if error in line_checker
             LineRuleChecker(file_full_path),
             SourceChecker(file_full_path),
         )
-    elif "sdkconfig.rename" in os.path.basename(file_full_path):
+    elif "tyconfig.rename" in os.path.basename(file_full_path):
         checkers = (SDKRenameChecker(file_full_path),)
 
     if not checkers:
@@ -646,7 +674,9 @@ def validate_file(file_full_path: str, verbose: bool = False, replace: bool = Fa
                     fail = True
                     f_o.write(e.suggested_line)
         except UnicodeDecodeError:
-            raise ValueError("The encoding of {} is not Unicode.".format(file_full_path))
+            raise ValueError(
+                "The encoding of {} is not Unicode.".format(file_full_path)
+            )
         finally:
             for checker in checkers:
                 try:
@@ -663,7 +693,9 @@ def validate_file(file_full_path: str, verbose: bool = False, replace: bool = Fa
             "\t{} has been saved with suggestions for resolving the issues.\n"
             "\tPlease note that the suggestions can be wrong and "
             "you might need to re-run the checker several times "
-            "for solving all issues".format(suggestions_full_path if not replace else file_full_path)
+            "for solving all issues".format(
+                suggestions_full_path if not replace else file_full_path
+            )
         )
         return False
     else:
@@ -708,7 +740,7 @@ def main() -> int:
         "--includes",
         "-d",
         nargs="*",
-        help="[only for --check deprecated] Paths for recursive search of sdkconfig files",
+        help="[only for --check deprecated] Paths for recursive search of tyconfig files",
         type=valid_directory,
     )
     parser.add_argument(
@@ -720,13 +752,18 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    if args.check == "syntax" and (args.includes is not None or args.exclude_submodules is not None):
+    if args.check == "syntax" and (
+        args.includes is not None or args.exclude_submodules is not None
+    ):
         raise argparse.ArgumentError(
-            None, "--includes and --exclude-submodules are available only when using --check deprecated option."
+            None,
+            "--includes and --exclude-submodules are available only when using --check deprecated option.",
         )
 
     if args.check == "deprecated" and args.replace:
-        raise argparse.ArgumentError(None, "--replace is available only when using --check syntax option.")
+        raise argparse.ArgumentError(
+            None, "--replace is available only when using --check syntax option."
+        )
 
     success_counter = 0
     failure_counter = 0
@@ -744,9 +781,13 @@ def main() -> int:
         if args.check == "syntax":
             file_ok = validate_file(full_path, args.verbose, args.replace)
         elif args.check == "deprecated":
-            file_ok = check_deprecated_options(full_path, deprecated_options, ignore_dirs)
+            file_ok = check_deprecated_options(
+                full_path, deprecated_options, ignore_dirs
+            )
         else:
-            raise argparse.ArgumentError(None, f"Unknown check type: {args.check} passed to --check argument.")
+            raise argparse.ArgumentError(
+                None, f"Unknown check type: {args.check} passed to --check argument."
+            )
 
         if file_ok is None:
             ignored_counter += 1
@@ -759,11 +800,17 @@ def main() -> int:
         return "s" if cnt > 1 else ""
 
     if success_counter > 0:
-        print(f"{success_counter} file{_handle_plural(success_counter)} have been successfully checked.")
+        print(
+            f"{success_counter} file{_handle_plural(success_counter)} have been successfully checked."
+        )
     if ignored_counter > 0:
-        print(f"{ignored_counter} file{_handle_plural(success_counter)} have been ignored.")
+        print(
+            f"{ignored_counter} file{_handle_plural(success_counter)} have been ignored."
+        )
     if failure_counter > 0:
-        print(f"{failure_counter} file{_handle_plural(success_counter)} have errors. Please take a look at the log.")
+        print(
+            f"{failure_counter} file{_handle_plural(success_counter)} have errors. Please take a look at the log."
+        )
         return 1
 
     if not files:

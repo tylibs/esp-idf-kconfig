@@ -52,11 +52,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        # set up temporary file to use as sdkconfig copy
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_sdkconfig:
-            temp_sdkconfig_path = os.path.join(tempfile.gettempdir(), temp_sdkconfig.name)
-            with open("sdkconfig") as orig:
-                temp_sdkconfig.write(orig.read())
+        # set up temporary file to use as tyconfig copy
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_tyconfig:
+            temp_tyconfig_path = os.path.join(tempfile.gettempdir(), temp_tyconfig.name)
+            with open("tyconfig") as orig:
+                temp_tyconfig.write(orig.read())
 
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_kconfigs_source_file = os.path.join(tempfile.gettempdir(), f.name)
@@ -73,7 +73,7 @@ def main():
                   """ % (
             temp_kconfigs_source_file,
             temp_kconfig_projbuilds_source_file,
-            temp_sdkconfig_path,
+            temp_tyconfig_path,
         )
 
         cmdline = re.sub(r" +", " ", cmdline)
@@ -95,7 +95,7 @@ def main():
         for version in PROTOCOL_VERSIONS:
             test_protocol_version(p, version)
 
-        test_load_save(p, temp_sdkconfig_path)
+        test_load_save(p, temp_tyconfig_path)
 
         test_invalid_json(p)
 
@@ -103,7 +103,7 @@ def main():
 
     finally:
         try:
-            os.remove(temp_sdkconfig_path)
+            os.remove(temp_tyconfig_path)
             os.remove(temp_kconfigs_source_file)
             os.remove(temp_kconfig_projbuilds_source_file)
         except OSError:
@@ -131,7 +131,7 @@ def test_protocol_version(p, version):
     print("*****")
     print("Testing version %d..." % version)
 
-    # reload the config from the sdkconfig file
+    # reload the config from the tyconfig file
     req = {"version": version, "load": None}
     readback = send_request(p, req)
     print("Reset response: %s" % (json.dumps(readback)))
@@ -154,26 +154,26 @@ def test_protocol_version(p, version):
     print("Version %d OK" % version)
 
 
-def test_load_save(p, temp_sdkconfig_path):
+def test_load_save(p, temp_tyconfig_path):
     print("Testing load/save...")
-    before = os.stat(temp_sdkconfig_path).st_mtime
-    save_result = send_request(p, {"version": 2, "save": temp_sdkconfig_path})
+    before = os.stat(temp_tyconfig_path).st_mtime
+    save_result = send_request(p, {"version": 2, "save": temp_tyconfig_path})
     print("Save result: %s" % (json.dumps(save_result)))
     assert "error" not in save_result
     assert len(save_result["values"]) == 0  # nothing changes when we save
     assert len(save_result["ranges"]) == 0
-    after = os.stat(temp_sdkconfig_path).st_mtime
+    after = os.stat(temp_tyconfig_path).st_mtime
     assert after > before  # something got written to disk
 
     # Do a V2 load
-    load_result = send_request(p, {"version": 2, "load": temp_sdkconfig_path})
+    load_result = send_request(p, {"version": 2, "load": temp_tyconfig_path})
     print("V2 Load result: %s" % (json.dumps(load_result)))
     assert "error" not in load_result
     assert len(load_result["values"]) == 0  # in V2, loading same file should return no config items
     assert len(load_result["ranges"]) == 0
 
     # Do a V1 load
-    load_result = send_request(p, {"version": 1, "load": temp_sdkconfig_path})
+    load_result = send_request(p, {"version": 1, "load": temp_tyconfig_path})
     print("V1 Load result: %s" % (json.dumps(load_result)))
     assert "error" not in load_result
     assert len(load_result["values"]) > 0  # in V1, loading same file should return all config items

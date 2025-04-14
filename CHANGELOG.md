@@ -3,12 +3,12 @@
 ### New Features
 
 - **kconfig**: Allow multiple definition without info statement
-- **kconfcheck**: checks for deprecated values in sdkconfig.[ci|defaults]
+- **kconfcheck**: checks for deprecated values in tyconfig.[ci|defaults]
 - **kconfiglib**: parser v2 support of conditional configs inside choice
 
 ### Bug Fixes
 
-- allow old names contain lowercase letters in sdkconfig.rename
+- allow old names contain lowercase letters in tyconfig.rename
 - **docs**: typo in word orsource (was "oursource")
 - Add Python 3.13 as supported version
 
@@ -23,7 +23,7 @@
 ### New Features
 
 - **kconfiglib**: Check duplicate symbol definitions
-- add sdkconfig.rename checker
+- add tyconfig.rename checker
 - **kconfcheck**: Add in-place suggestions when running as precommit hook
 - **kconfiglib**: Add new parser based on pyparsing
 
@@ -50,12 +50,12 @@
 ### New Features
 
 - **kconfcheck**: add check whether symbol name is all uppercase
-- **kconfgen**: Support renames with inversion in sdkconfig.renames
+- **kconfgen**: Support renames with inversion in tyconfig.renames
 
 ### Bug Fixes
 
 - **kconfgen**: Improve error message for int/hex without default
-- **kconfgen**: Disallow rename to the same name in sdkconfig.renames
+- **kconfgen**: Disallow rename to the same name in tyconfig.renames
 - Dont ask for the filename when saving configuration
 
 ### Code Refactoring

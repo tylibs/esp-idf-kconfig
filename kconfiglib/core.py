@@ -425,7 +425,7 @@ Preferably, user-defined functions should be stateless.
 # Public classes
 #
 
-POLICY_USE_SDKCONFIG = "sdkconfig"
+POLICY_USE_TYCONFIG = "tyconfig"
 POLICY_INTERACTIVE = "interactive"
 POLICY_USE_KCONFIG = "kconfig"
 
@@ -593,7 +593,11 @@ class Kconfig(object):
         """
         self._encoding = encoding
 
-        self.parser_version = parser_version if parser_version else int(os.environ.get("KCONFIG_PARSER_VERSION", "1"))
+        self.parser_version = (
+            parser_version
+            if parser_version
+            else int(os.environ.get("KCONFIG_PARSER_VERSION", "1"))
+        )
 
         """
         allowed_multi_def_choices:
@@ -717,25 +721,37 @@ class Kconfig(object):
 
         """
         defaults_policy:
-            Determines how to resolve conflicts in default values between sdkconfig and Kconfig
+            Determines how to resolve conflicts in default values between tyconfig and Kconfig
             for configuration options.
         """
-        self.defaults_policy = os.environ.get("KCONFIG_DEFAULTS_POLICY", POLICY_USE_SDKCONFIG)
-        if self.defaults_policy not in (POLICY_USE_SDKCONFIG, POLICY_INTERACTIVE, POLICY_USE_KCONFIG):
-            self._warn("Malformed KCONFIG_DEFAULTS_POLICY environment variable. Using default policy.")
-            self.defaults_policy = POLICY_USE_SDKCONFIG
+        self.defaults_policy = os.environ.get(
+            "KCONFIG_DEFAULTS_POLICY", POLICY_USE_TYCONFIG
+        )
+        if self.defaults_policy not in (
+            POLICY_USE_TYCONFIG,
+            POLICY_INTERACTIVE,
+            POLICY_USE_KCONFIG,
+        ):
+            self._warn(
+                "Malformed KCONFIG_DEFAULTS_POLICY environment variable. Using default policy."
+            )
+            self.defaults_policy = POLICY_USE_TYCONFIG
 
         """
         comment_default_value:
-            To distinguish if a config option has a default value in the sdkconfig file,
+            To distinguish if a config option has a default value in the tyconfig file,
             lines with config option set to default value are preceded by the comment
             specified by self.comment_default_value.
         """
         self.comment_default_value = "# default:"
 
         # Regular expressions for parsing .config files
-        self._set_match = re.compile(self.config_prefix + r"([^=]+)=(.*)", re.ASCII).match
-        self._unset_match = re.compile(rf"# {self.config_prefix}([^ ]+) is not set", re.ASCII).match
+        self._set_match = re.compile(
+            self.config_prefix + r"([^=]+)=(.*)", re.ASCII
+        ).match
+        self._unset_match = re.compile(
+            rf"# {self.config_prefix}([^ ]+) is not set", re.ASCII
+        ).match
 
         """
         config_header:
@@ -858,7 +874,9 @@ class Kconfig(object):
         # Add any user-defined preprocessor functions
         try:
             self._functions.update(
-                importlib.import_module(os.getenv("KCONFIG_FUNCTIONS", "kconfigfunctions")).functions
+                importlib.import_module(
+                    os.getenv("KCONFIG_FUNCTIONS", "kconfigfunctions")
+                ).functions
             )
         except ImportError:
             pass
@@ -883,7 +901,12 @@ class Kconfig(object):
             Acts as the root of the menu tree.
         """
         self.top_node = MenuNode(
-            kconfig=self, item=MENU, is_menuconfig=True, prompt=("Main menu", self.y), filename=filename, linenr=1
+            kconfig=self,
+            item=MENU,
+            is_menuconfig=True,
+            prompt=("Main menu", self.y),
+            filename=filename,
+            linenr=1,
         )
 
         # Parse the Kconfig files
@@ -952,7 +975,9 @@ class Kconfig(object):
         """
         # Open the top-level Kconfig file. Store the readline() method directly
         # as a small optimization.
-        self._readline = open(join(self.srctree, self.filename), "r", encoding=self._encoding).readline
+        self._readline = open(
+            join(self.srctree, self.filename), "r", encoding=self._encoding
+        ).readline
         self.root_file = join(self.srctree, self.filename)
 
         try:
@@ -1156,7 +1181,7 @@ class Kconfig(object):
     def _load_config(self, filename, replace):
         def _inject_default_value(sym: Symbol, val: Any) -> None:
             """
-            When using default values from sdkconfig, we need to temporarily inject the default value of the symbol
+            When using default values from tyconfig, we need to temporarily inject the default value of the symbol
             to the build system.
             NOTE: Temporarily = for current configuration session/current Kconfig run.
             """
@@ -1170,7 +1195,11 @@ class Kconfig(object):
                 if sym.orig_type == STRING:
                     sym_for_val = self._lookup_const_sym(val)
                 else:
-                    sym_for_val = self._lookup_const_sym(val) if val in ("y", "n") else self._lookup_sym(val)
+                    sym_for_val = (
+                        self._lookup_const_sym(val)
+                        if val in ("y", "n")
+                        else self._lookup_sym(val)
+                    )
                 node.defaults = [(sym_for_val, self.y)] + node.defaults
             # Invalidate recursively to propagate the change to dependent symbols
             sym._rec_invalidate()
@@ -1184,9 +1213,9 @@ class Kconfig(object):
         def _quote_value(val: str, sym_type: str) -> str:
             return val if (val in ("y", "n") or sym_type == INT) else f'"{val}"'
 
-        # We need to first load symbols with user-set value, but those can be anywhere in sdkconfig.
+        # We need to first load symbols with user-set value, but those can be anywhere in tyconfig.
         # We cache symbols with default values and set them additionally.
-        # SYMBOL: VAL_FROM_SDKCONFIG
+        # SYMBOL: VAL_FROM_TYCONFIG
         symbols_with_default_values: Dict[str, str] = dict()
         # SYMBOL_NAME: (OLD_VAL, NEW_VAL)
         symbols_with_changed_defaults: Dict[str, Tuple[str, str]] = dict()
@@ -1306,31 +1335,35 @@ class Kconfig(object):
 
                 # If the value is not set to default
                 if not value_is_default:
-                    sym._sdkconfig_value = val
+                    sym._tyconfig_value = val
                     sym.set_value(val)
-                else:  # Symbol has only a default value and it is different between sdkconfig and Kconfig
+                else:  # Symbol has only a default value and it is different between tyconfig and Kconfig
                     symbols_with_default_values[sym] = val
 
                 value_is_default = False
 
             for sym in symbols_with_default_values:
                 val = symbols_with_default_values[sym]
-                sym._sdkconfig_value = val
+                sym._tyconfig_value = val
                 sym._loaded_as_default = True
                 if sym._user_value is None and sym.str_value != str(val):
                     self._info(
-                        f"Default value for {sym.name} in sdkconfig is [bold]{_quote_value(val, sym.orig_type)}[/bold] "
+                        f"Default value for {sym.name} in tyconfig is [bold]{_quote_value(val, sym.orig_type)}[/bold] "
                         f"but it is [bold]{_quote_value(sym.str_value, sym.orig_type)}[/bold] according to Kconfig."
                     )
-                    if self.defaults_policy == POLICY_USE_SDKCONFIG:  # Use default value from sdkconfig
+                    if (
+                        self.defaults_policy == POLICY_USE_TYCONFIG
+                    ):  # Use default value from tyconfig
                         self._info(
-                            "     Using default value from sdkconfig "
+                            "     Using default value from tyconfig "
                             f"([bold]{_quote_value(val, sym.orig_type)}[/bold]).\n"
                             "      HINT: you can run `idf.py refresh-config` to use different default value source.",
                             supress_info_prefix=True,
                         )
                         _inject_default_value(sym, val)
-                    elif self.defaults_policy == POLICY_USE_KCONFIG:  # Use default value from Kconfig
+                    elif (
+                        self.defaults_policy == POLICY_USE_KCONFIG
+                    ):  # Use default value from Kconfig
                         self._info(
                             "Using default value from Kconfig "
                             f"([bold]{_quote_value(sym.str_value, sym.orig_type)}[/bold]).\n"
@@ -1341,18 +1374,21 @@ class Kconfig(object):
                         preffered_source = None
                         while preffered_source not in ("s", "k"):
                             preffered_source = input(
-                                "Do you want to use default value from sdkconfig (s) "
+                                "Do you want to use default value from tyconfig (s) "
                                 "(value will be converted to user-set) or from Kconfig (k)? [s/k]:"
                             ).lower()
                         if preffered_source == "s":
-                            # NOTE: This will make "default" from sdkconfig a user-set value.
-                            # Reason: If we keep it as default, the message about defaults differing between sdkconfig
+                            # NOTE: This will make "default" from tyconfig a user-set value.
+                            # Reason: If we keep it as default, the message about defaults differing between tyconfig
                             # and Kconfig would still be present because default values between
-                            # sdkconfig and Kconfig would still differ.
+                            # tyconfig and Kconfig would still differ.
                             sym.set_value(val)
                             unchanged_symbols[sym.name] = val
                         elif preffered_source == "k":
-                            symbols_with_changed_defaults[sym.name] = (sym.str_value, val)
+                            symbols_with_changed_defaults[sym.name] = (
+                                sym.str_value,
+                                val,
+                            )
                     else:
                         KconfigError(
                             f"Unsupported default policy in KCONFIG_DEFAULTS_POLICY envvar: {self.defaults_policy}"
@@ -1366,7 +1402,9 @@ class Kconfig(object):
             if symbols_with_changed_defaults:
                 print("Default values for the following symbols were changed:")
                 for sym in symbols_with_changed_defaults:
-                    print(f"{sym}: {symbols_with_changed_defaults[sym][0]} -> {symbols_with_changed_defaults[sym][1]}")
+                    print(
+                        f"{sym}: {symbols_with_changed_defaults[sym][0]} -> {symbols_with_changed_defaults[sym][1]}"
+                    )
             if unchanged_symbols:
                 print("Default values for the following symbols were not changed:")
                 for sym in unchanged_symbols:
@@ -1641,7 +1679,9 @@ class Kconfig(object):
                     add("\n")
                 add(conf_string)
 
-            elif expr_value(node.dep) and ((item == MENU and expr_value(node.visibility)) or item == COMMENT):
+            elif expr_value(node.dep) and (
+                (item == MENU and expr_value(node.visibility)) or item == COMMENT
+            ):
                 add(f"\n#\n# {node.prompt[0]}\n#\n")
                 after_end_comment = False
 
@@ -1810,7 +1850,11 @@ class Kconfig(object):
                 (
                     f"configuration with {len(self.syms)} symbols",
                     f'main menu prompt "{self.mainmenu_text}"',
-                    "srctree is current directory" if not self.srctree else f'srctree "{self.srctree}"',
+                    (
+                        "srctree is current directory"
+                        if not self.srctree
+                        else f'srctree "{self.srctree}"'
+                    ),
                     f'config symbol prefix "{self.config_prefix}"',
                     f"warnings {status(self.warn)}",
                     f"printing of warnings to stderr {status(self.warn_to_stderr)}",
@@ -1842,7 +1886,9 @@ class Kconfig(object):
             try:
                 return open(join(self.srctree, filename), "r", encoding=self._encoding)
             except OSError as e:
-                env_var_value = f"set to '{self.srctree}'" if self.srctree else "unset or blank"
+                env_var_value = (
+                    f"set to '{self.srctree}'" if self.srctree else "unset or blank"
+                )
                 raise _KconfigIOError(
                     e,
                     f"Could not open '{filename}' ({errno.errorcode[e.errno]}: {e.strerror}). Check that the $srctree "
@@ -1899,7 +1945,9 @@ class Kconfig(object):
                         self.filename,
                         self.linenr,
                         rel_filename,
-                        "\n".join(f"{name}:{linenr}" for name, linenr in self._include_path),
+                        "\n".join(
+                            f"{name}:{linenr}" for name, linenr in self._include_path
+                        ),
                     )
                 )
 
@@ -2048,7 +2096,10 @@ class Kconfig(object):
             if match:
                 sym_choice_name = match.groups()[1]
                 if sym_choice_name:
-                    if match.group("type") in (_MULTIPLE_DEFINITION_LONG, _MULTIPLE_DEFINITION_SHORT):
+                    if match.group("type") in (
+                        _MULTIPLE_DEFINITION_LONG,
+                        _MULTIPLE_DEFINITION_SHORT,
+                    ):
                         if match.group("option") == "config":
                             self.allowed_multi_def_syms.add(sym_choice_name)
                         elif match.group("option") == "choice":
@@ -2129,7 +2180,11 @@ class Kconfig(object):
                     else:
                         i = match.end()
 
-                    token = self.const_syms[name] if name in STR_TO_BOOL else self._lookup_sym(name)
+                    token = (
+                        self.const_syms[name]
+                        if name in STR_TO_BOOL
+                        else self._lookup_sym(name)
+                    )
 
                 else:
                     # It's a case of missing quotes. For example, the
@@ -2181,14 +2236,22 @@ class Kconfig(object):
                         #
                         # The preprocessor functionality changed how
                         # environment variables are referenced, to $(FOO).
-                        val = expandvars(s[i + 1 : end_i - 1].replace("$UNAME_RELEASE", _UNAME_RELEASE))
+                        val = expandvars(
+                            s[i + 1 : end_i - 1].replace(
+                                "$UNAME_RELEASE", _UNAME_RELEASE
+                            )
+                        )
 
                         i = end_i
 
                     # This is the only place where we don't survive with a
                     # single token of lookback: 'option env="FOO"' does not
                     # refer to a constant symbol named "FOO".
-                    token = val if token in _STRING_LEX or tokens[0] is _T_OPTION else self._lookup_const_sym(val)
+                    token = (
+                        val
+                        if token in _STRING_LEX or tokens[0] is _T_OPTION
+                        else self._lookup_const_sym(val)
+                    )
 
                 elif s.startswith("&&", i):
                     token = _T_AND
@@ -2370,7 +2433,9 @@ class Kconfig(object):
         else:  # op == "+="
             # += does immediate expansion if the variable was last set
             # with :=
-            var.value += " " + (val if var.is_recursive else self._expand_whole(val, ()))
+            var.value += " " + (
+                val if var.is_recursive else self._expand_whole(val, ())
+            )
 
     def _expand_whole(self, s, args):
         # Expands preprocessor macros in all of 's'. Used whenever we don't
@@ -2527,11 +2592,15 @@ class Kconfig(object):
             if len(args) == 1:
                 # Plain variable
                 if var._n_expansions:
-                    self._parse_error(f"Preprocessor variable {var.name} recursively references itself")
+                    self._parse_error(
+                        f"Preprocessor variable {var.name} recursively references itself"
+                    )
             elif var._n_expansions > 100:
                 # Allow functions to call themselves, but guess that functions
                 # that are overly recursive are stuck
-                self._parse_error(f"Preprocessor function {var.name} seems stuck in infinite recursion")
+                self._parse_error(
+                    f"Preprocessor function {var.name} seems stuck in infinite recursion"
+                )
 
             var._n_expansions += 1
             res = self._expand_whole(self.variables[fn].value, args)
@@ -2543,7 +2612,9 @@ class Kconfig(object):
 
             py_fn, min_arg, max_arg = self._functions[fn]
 
-            if len(args) - 1 < min_arg or (max_arg is not None and len(args) - 1 > max_arg):
+            if len(args) - 1 < min_arg or (
+                max_arg is not None and len(args) - 1 > max_arg
+            ):
                 if min_arg == max_arg:
                     expected_args = min_arg
                 elif max_arg is None:
@@ -2671,7 +2742,9 @@ class Kconfig(object):
 
                 self._parse_props(node)
                 if node.is_menuconfig and not node.prompt:
-                    self._warn(f"the menuconfig symbol {sym.name_and_loc} has no prompt")
+                    self._warn(
+                        f"the menuconfig symbol {sym.name_and_loc} has no prompt"
+                    )
 
                 # Equivalent to
                 #
@@ -2711,7 +2784,11 @@ class Kconfig(object):
                             self.linenr,
                             pattern,
                             self._line.strip(),
-                            f"set to '{self.srctree}'" if self.srctree else "unset or blank",
+                            (
+                                f"set to '{self.srctree}'"
+                                if self.srctree
+                                else "unset or blank"
+                            ),
                         )
                     )
 
@@ -2731,7 +2808,9 @@ class Kconfig(object):
                 return prev
 
             elif t0 == _T_IF:
-                node = MenuNode(kconfig=self, parent=parent, dep=self._expect_expr_and_eol())
+                node = MenuNode(
+                    kconfig=self, parent=parent, dep=self._expect_expr_and_eol()
+                )
 
                 self._parse_block(_T_ENDIF, node, node)
                 node.list = node.next
@@ -2816,11 +2895,15 @@ class Kconfig(object):
                 self._parse_error(
                     "no corresponding 'choice'"
                     if t0 == _T_ENDCHOICE
-                    else "no corresponding 'if'"
-                    if t0 == _T_ENDIF
-                    else "no corresponding 'menu'"
-                    if t0 == _T_ENDMENU
-                    else "unrecognized construct"
+                    else (
+                        "no corresponding 'if'"
+                        if t0 == _T_ENDIF
+                        else (
+                            "no corresponding 'menu'"
+                            if t0 == _T_ENDMENU
+                            else "unrecognized construct"
+                        )
+                    )
                 )
 
         # End of file reached. Return the last node.
@@ -2901,7 +2984,9 @@ class Kconfig(object):
                 self._parse_prompt(node)
 
             elif t0 == _T_RANGE:
-                node.ranges.append((self._expect_sym(), self._expect_sym(), self._parse_cond()))
+                node.ranges.append(
+                    (self._expect_sym(), self._expect_sym(), self._parse_cond())
+                )
 
             elif t0 == _T_IMPLY:
                 if node.item.__class__ is not Symbol:
@@ -2925,7 +3010,9 @@ class Kconfig(object):
                         "which is not supported for choices"
                     )
                 else:
-                    node.visibility = self._make_and(node.visibility, self._expect_expr_and_eol())
+                    node.visibility = self._make_and(
+                        node.visibility, self._expect_expr_and_eol()
+                    )
 
             elif t0 == _T_OPTION:
                 if self._check_token(_T_ENV):
@@ -2936,7 +3023,9 @@ class Kconfig(object):
                     node.item.env_var = env_var
 
                     if env_var in os.environ:
-                        node.defaults.append((self._lookup_const_sym(os.environ[env_var]), self.y))
+                        node.defaults.append(
+                            (self._lookup_const_sym(os.environ[env_var]), self.y)
+                        )
                     else:
                         self._warn(
                             f"{node.item.name} has 'option env=\"{env_var}\"', "
@@ -2971,7 +3060,9 @@ class Kconfig(object):
 
                 elif self._check_token(_T_ALLNOCONFIG_Y):
                     if node.item.__class__ is not Symbol:
-                        self._parse_error("the 'allnoconfig_y' option is only valid for symbols")
+                        self._parse_error(
+                            "the 'allnoconfig_y' option is only valid for symbols"
+                        )
 
                     node.item.is_allnoconfig_y = True
 
@@ -3004,7 +3095,10 @@ class Kconfig(object):
         # multiple times
 
         if node.prompt:
-            self._warn(node.item.name_and_loc + " defined with multiple prompts in single location")
+            self._warn(
+                node.item.name_and_loc
+                + " defined with multiple prompts in single location"
+            )
 
         prompt = self._tokens[1]
         self._tokens_i = 2
@@ -3013,7 +3107,10 @@ class Kconfig(object):
             self._parse_error("expected prompt string")
 
         if prompt != prompt.strip():
-            self._warn(node.item.name_and_loc + " has leading or trailing whitespace in its prompt")
+            self._warn(
+                node.item.name_and_loc
+                + " has leading or trailing whitespace in its prompt"
+            )
 
             # This avoid issues for e.g. reStructuredText documentation, where
             # '*prompt *' is invalid
@@ -3119,7 +3216,11 @@ class Kconfig(object):
         # Return 'and_expr' directly if we have a "single-operand" OR.
         # Otherwise, parse the expression on the right and make an OR node.
         # This turns A || B || C || D into (OR, A, (OR, B, (OR, C, D))).
-        return and_expr if not self._check_token(_T_OR) else (OR, and_expr, self._parse_expr())
+        return (
+            and_expr
+            if not self._check_token(_T_OR)
+            else (OR, and_expr, self._parse_expr())
+        )
 
     def _parse_and_expr(self):
         factor = self._parse_factor()
@@ -3127,7 +3228,11 @@ class Kconfig(object):
         # Return 'factor' directly if we have a "single-operand" AND.
         # Otherwise, parse the right operand and make an AND node. This turns
         # A && B && C && D into (AND, A, (AND, B, (AND, C, D))).
-        return factor if not self._check_token(_T_AND) else (AND, factor, self._parse_and_expr())
+        return (
+            factor
+            if not self._check_token(_T_AND)
+            else (AND, factor, self._parse_and_expr())
+        )
 
     def _parse_factor(self):
         token = self._tokens[self._tokens_i]
@@ -3359,19 +3464,31 @@ class Kconfig(object):
 
                 # Propagate dependencies to defaults
                 if cur.defaults:
-                    cur.defaults = [(default, self._make_and(cond, dep)) for default, cond in cur.defaults]
+                    cur.defaults = [
+                        (default, self._make_and(cond, dep))
+                        for default, cond in cur.defaults
+                    ]
 
                 # Propagate dependencies to ranges
                 if cur.ranges:
-                    cur.ranges = [(low, high, self._make_and(cond, dep)) for low, high, cond in cur.ranges]
+                    cur.ranges = [
+                        (low, high, self._make_and(cond, dep))
+                        for low, high, cond in cur.ranges
+                    ]
 
                 # Propagate dependencies to selects
                 if cur.selects:
-                    cur.selects = [(target, self._make_and(cond, dep)) for target, cond in cur.selects]
+                    cur.selects = [
+                        (target, self._make_and(cond, dep))
+                        for target, cond in cur.selects
+                    ]
 
                 # Propagate dependencies to implies
                 if cur.implies:
-                    cur.implies = [(target, self._make_and(cond, dep)) for target, cond in cur.implies]
+                    cur.implies = [
+                        (target, self._make_and(cond, dep))
+                        for target, cond in cur.implies
+                    ]
 
             elif cur.prompt:  # Not a symbol/choice
                 # Propagate dependencies to the prompt. 'visible if' is only
@@ -3410,7 +3527,9 @@ class Kconfig(object):
         # Modify the weak reverse dependencies of the implied
         # symbol
         for target, cond in node.implies:
-            target.weak_rev_dep = self._make_or(target.weak_rev_dep, self._make_and(sym, cond))
+            target.weak_rev_dep = self._make_or(
+                target.weak_rev_dep, self._make_and(sym, cond)
+            )
 
     #
     # Misc.
@@ -3425,7 +3544,10 @@ class Kconfig(object):
         """
         for sym in self.unique_defined_syms:
             if len(sym.nodes) > 1:
-                occurrences = set(f"    {os.path.abspath(node.filename)}:{node.linenr}" for node in sym.nodes)
+                occurrences = set(
+                    f"    {os.path.abspath(node.filename)}:{node.linenr}"
+                    for node in sym.nodes
+                )
                 if len(occurrences) > 1 and sym.name not in self.allowed_multi_def_syms:
                     occurrences = "\n".join(occurrences)
                     self._info(
@@ -3434,8 +3556,14 @@ class Kconfig(object):
                     )
 
         for choice in self.unique_choices:
-            if len(choice.nodes) > 1 and choice.name not in self.allowed_multi_def_choices:
-                occurrences = set(f"    {os.path.abspath(node.filename)}:{node.linenr}" for node in choice.nodes)
+            if (
+                len(choice.nodes) > 1
+                and choice.name not in self.allowed_multi_def_choices
+            ):
+                occurrences = set(
+                    f"    {os.path.abspath(node.filename)}:{node.linenr}"
+                    for node in choice.nodes
+                )
                 if len(occurrences) > 1:
                     occurrences = "\n".join(occurrences)
                     self._info(
@@ -3486,7 +3614,11 @@ class Kconfig(object):
                         )
 
                     if sym.orig_type == STRING:
-                        if not default.is_constant and not default.nodes and not default.name.isupper():
+                        if (
+                            not default.is_constant
+                            and not default.nodes
+                            and not default.name.isupper()
+                        ):
                             # 'default foo' on a string symbol could be either a symbol
                             # reference or someone leaving out the quotes. Guess that
                             # the quotes were left out if 'foo' isn't all-uppercase
@@ -3502,7 +3634,9 @@ class Kconfig(object):
                         )
 
                 if sym.selects or sym.implies:
-                    self._warn(f"the {TYPE_TO_STR[sym.orig_type]} symbol {sym.name_and_loc} has selects or implies")
+                    self._warn(
+                        f"the {TYPE_TO_STR[sym.orig_type]} symbol {sym.name_and_loc} has selects or implies"
+                    )
 
             else:  # UNKNOWN
                 self._warn(f"{sym.name_and_loc} defined without a type")
@@ -3514,7 +3648,9 @@ class Kconfig(object):
                     )
                 else:
                     for low, high, _ in sym.ranges:
-                        if not num_ok(low, sym.orig_type) or not num_ok(high, sym.orig_type):
+                        if not num_ok(low, sym.orig_type) or not num_ok(
+                            high, sym.orig_type
+                        ):
                             self._warn(
                                 f"the {TYPE_TO_STR[sym.orig_type]} symbol {sym.name_and_loc} has "
                                 f"a non-{TYPE_TO_STR[sym.orig_type]} range [{low.name_and_loc}, {high.name_and_loc}]"
@@ -3538,7 +3674,9 @@ class Kconfig(object):
 
         for choice in self.unique_choices:
             if choice.orig_type != BOOL:
-                self._warn(f"{choice.name_and_loc} defined with type {TYPE_TO_STR[choice.orig_type]}")
+                self._warn(
+                    f"{choice.name_and_loc} defined with type {TYPE_TO_STR[choice.orig_type]}"
+                )
 
             for node in choice.nodes:
                 if node.prompt:
@@ -3548,7 +3686,9 @@ class Kconfig(object):
 
             for default, _ in choice.defaults:
                 if default.__class__ is not Symbol:
-                    raise KconfigError(f"{choice.name_and_loc} has a malformed default {expr_str(default)}")
+                    raise KconfigError(
+                        f"{choice.name_and_loc} has a malformed default {expr_str(default)}"
+                    )
 
                 if default.choice is not choice:
                     self._warn(
@@ -3573,10 +3713,14 @@ class Kconfig(object):
                 for node in sym.nodes:
                     if node.parent.item is choice:
                         if not node.prompt:
-                            self._warn(f"the choice symbol {sym.name_and_loc} has no prompt")
+                            self._warn(
+                                f"the choice symbol {sym.name_and_loc} has no prompt"
+                            )
 
                     elif node.prompt:
-                        self._warn(f"the choice symbol {sym.name_and_loc} is defined with a prompt outside the choice")
+                        self._warn(
+                            f"the choice symbol {sym.name_and_loc} is defined with a prompt outside the choice"
+                        )
 
     def _parse_error(self, msg):
         raise KconfigError(
@@ -3686,7 +3830,7 @@ class Symbol:
         "orig_type",
         "ranges",
         "rev_dep",
-        "_sdkconfig_value",
+        "_tyconfig_value",
         "selects",
         "_user_value",
         "weak_rev_dep",
@@ -3705,13 +3849,19 @@ class Symbol:
     env_var: Optional[str]
     ranges: List[Tuple]
     _loaded_as_default: bool
-    _sdkconfig_value: Optional[str]
+    _tyconfig_value: Optional[str]
     _cached_bool_val: Optional[int]
 
     #
     # Public interface
     #
-    def __init__(self, kconfig: Kconfig, name: str, is_constant: bool = False, init_rest: bool = True):
+    def __init__(
+        self,
+        kconfig: Kconfig,
+        name: str,
+        is_constant: bool = False,
+        init_rest: bool = True,
+    ):
         """
         Symbol constructor -- not intended to be called directly by Kconfiglib
         clients.
@@ -3862,22 +4012,22 @@ class Symbol:
         self._user_value = None
 
         """
-        sdkconfig_value:
-            With a new way of handling default values (they are now distinguished from user values in sdkconfig files),
-            the old way of determining whether it is needed to save new sdkconfig (checking whether _user_value is set)
-            is not valid anymore (values without _user_value just have default value, even when loaded from sdkconfig).
+        tyconfig_value:
+            With a new way of handling default values (they are now distinguished from user values in tyconfig files),
+            the old way of determining whether it is needed to save new tyconfig (checking whether _user_value is set)
+            is not valid anymore (values without _user_value just have default value, even when loaded from tyconfig).
 
-            sdkconfig_value now holds the value loaded from sdkconfig. It is used to determine whether the the value
+            tyconfig_value now holds the value loaded from tyconfig. It is used to determine whether the the value
             has changed in menuconfig.
 
-            If the value is not set, it means that the value was not loaded from sdkconfig -> potentially new symbol.
+            If the value is not set, it means that the value was not loaded from tyconfig -> potentially new symbol.
         """
-        self._sdkconfig_value = None
+        self._tyconfig_value = None
 
         """
         loaded_as_default:
-            sdkconfig_value on its own is not enough; we also need to check whether the value was loaded as a default
-            (user now can reset the value to default). This flag is set to True when the value is loaded from sdkconfig
+            tyconfig_value on its own is not enough; we also need to check whether the value was loaded as a default
+            (user now can reset the value to default). This flag is set to True when the value is loaded from tyconfig
             as a default value.
             Symbols with default value which has been "reset" in menuconfig will have this flag set to False.
         """
@@ -3968,8 +4118,16 @@ class Symbol:
 
                     # The zeros are from the C implementation running strtoll()
                     # on empty strings
-                    low = int(low_expr.str_value, base) if _is_base_n(low_expr.str_value, base) else 0
-                    high = int(high_expr.str_value, base) if _is_base_n(high_expr.str_value, base) else 0
+                    low = (
+                        int(low_expr.str_value, base)
+                        if _is_base_n(low_expr.str_value, base)
+                        else 0
+                    )
+                    high = (
+                        int(high_expr.str_value, base)
+                        if _is_base_n(high_expr.str_value, base)
+                        else 0
+                    )
 
                     break
             else:
@@ -4218,7 +4376,11 @@ class Symbol:
         # _write_to_conf is determined when the value is calculated. This is a
         # hidden function call due to property magic.
         val = self.str_value
-        pragma_default_comment = "" if self._user_value or self.choice else f"{self.kconfig.comment_default_value}\n"
+        pragma_default_comment = (
+            ""
+            if self._user_value or self.choice
+            else f"{self.kconfig.comment_default_value}\n"
+        )
         if not self._write_to_conf:
             return ""
 
@@ -4429,7 +4591,10 @@ class Symbol:
                 add(f'"{node.prompt[0]}"')
 
         # Only add quotes for non-bool symbols
-        add("value " + (self.str_value if self.orig_type == BOOL else f'"{self.str_value}"'))
+        add(
+            "value "
+            + (self.str_value if self.orig_type == BOOL else f'"{self.str_value}"')
+        )
 
         if not self.is_constant:
             # These aren't helpful to show for constant symbols
@@ -4438,7 +4603,11 @@ class Symbol:
                 # Only add quotes for non-bool symbols
                 add(
                     "user value "
-                    + (BOOL_TO_STR[self._user_value] if self.orig_type == BOOL else f'"{self._user_value}"')
+                    + (
+                        BOOL_TO_STR[self._user_value]
+                        if self.orig_type == BOOL
+                        else f'"{self._user_value}"'
+                    )
                 )
 
             add("visibility " + BOOL_TO_STR[self.visibility])
@@ -4529,7 +4698,9 @@ class Symbol:
     def _invalidate(self):
         # Marks the symbol as needing to be recalculated
 
-        self._cached_str_val = self._cached_bool_val = self._cached_vis = self._cached_assignable = None
+        self._cached_str_val = self._cached_bool_val = self._cached_vis = (
+            self._cached_assignable
+        ) = None
 
     def _rec_invalidate(self):
         # Invalidates the symbol and all items that (possibly) depend on it
@@ -4577,7 +4748,10 @@ class Symbol:
                 return
 
         if self.kconfig._warn_assign_no_prompt:
-            self.kconfig._warn(self.name_and_loc + " has no prompt, meaning user values have no effect on it")
+            self.kconfig._warn(
+                self.name_and_loc
+                + " has no prompt, meaning user values have no effect on it"
+            )
 
     def _str_default(self):
         # write_min_config() helper function. Returns the value the symbol
@@ -4676,9 +4850,16 @@ class Choice:
     name: Optional[str]
     nodes: List["MenuNode"]
     syms: List[Symbol]
-    defaults: List[Tuple[Any, Any]]  # Tuple[condition, expression], both can be pretty complicated
+    defaults: List[
+        Tuple[Any, Any]
+    ]  # Tuple[condition, expression], both can be pretty complicated
 
-    def __init__(self, kconfig: Kconfig, name: Optional[str] = None, direct_dep: Optional[Symbol] = None):
+    def __init__(
+        self,
+        kconfig: Kconfig,
+        name: Optional[str] = None,
+        direct_dep: Optional[Symbol] = None,
+    ):
         self.kconfig = kconfig
         self.name = name
 
@@ -5105,7 +5286,9 @@ class MenuNode:
     next: Optional["MenuNode"]
     parent: Optional["MenuNode"]
     prompt: Optional[Tuple]
-    defaults: List[Tuple[Any, Any]]  # Tuple[condition, expression], both can be pretty complicated
+    defaults: List[
+        Tuple[Any, Any]
+    ]  # Tuple[condition, expression], both can be pretty complicated
     selects: List[Tuple]
     implies: List[Tuple]
     ranges: List[Tuple]
@@ -5413,7 +5596,9 @@ class MenuNode:
             add("menu node for comment")
 
         if self.prompt:
-            add(f'prompt "{self.prompt[0]}" (visibility {BOOL_TO_STR[expr_value(self.prompt[1])]})')
+            add(
+                f'prompt "{self.prompt[0]}" (visibility {BOOL_TO_STR[expr_value(self.prompt[1])]})'
+            )
 
         if self.item.__class__ is Symbol and self.is_menuconfig:
             add("is menuconfig")
@@ -5505,7 +5690,9 @@ class MenuNode:
                 # Symbol defined without a type (which generates a warning)
                 prefix = "prompt"
 
-            indent_add_cond(prefix + f' "{escape(self.prompt[0])}"', self.orig_prompt[1])
+            indent_add_cond(
+                prefix + f' "{escape(self.prompt[0])}"', self.orig_prompt[1]
+            )
 
         if sc.__class__ is Symbol:
             if sc.is_allnoconfig_y:
@@ -5638,7 +5825,9 @@ class InternalError(Exception):
 class _KconfigIOError(IOError):
     def __init__(self, ioerror, msg):
         self.msg = msg
-        super(_KconfigIOError, self).__init__(ioerror.errno, ioerror.strerror, ioerror.filename)
+        super(_KconfigIOError, self).__init__(
+            ioerror.errno, ioerror.strerror, ioerror.filename
+        )
 
     def __str__(self):
         return self.msg
@@ -5702,15 +5891,19 @@ def expr_value(expr: Union[Symbol, Choice, Tuple]) -> int:
     return 2 * (  # type: ignore
         comp == 0
         if rel == EQUAL
-        else comp != 0
-        if rel == UNEQUAL
-        else comp < 0
-        if rel == LESS
-        else comp <= 0
-        if rel == LESS_EQUAL
-        else comp > 0
-        if rel == GREATER
-        else comp >= 0
+        else (
+            comp != 0
+            if rel == UNEQUAL
+            else (
+                comp < 0
+                if rel == LESS
+                else (
+                    comp <= 0
+                    if rel == LESS_EQUAL
+                    else comp > 0 if rel == GREATER else comp >= 0
+                )
+            )
+        )
     )
 
 
@@ -5886,7 +6079,9 @@ def standard_kconfig(description=None):
     """
     import argparse
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description=description)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter, description=description
+    )
 
     parser.add_argument(
         "kconfig",
@@ -5902,7 +6097,9 @@ def standard_kconfig(description=None):
     # there would be a dedicated option for this.
     try:
         parser_version = int(os.environ.get("KCONFIG_PARSER_VERSION", "1"))
-        kconfig = Kconfig(parsed_args.kconfig, suppress_traceback=True, parser_version=parser_version)
+        kconfig = Kconfig(
+            parsed_args.kconfig, suppress_traceback=True, parser_version=parser_version
+        )
     except (EnvironmentError, KconfigError) as e:
         cmd = sys.argv[0]  # Empty string if missing
         if cmd:
@@ -5994,7 +6191,11 @@ def _sym_to_num(sym):
     # ValueError for symbols that can't be converted.
 
     # For BOOL n/y count as 0/2.
-    return sym.bool_value if sym.orig_type == BOOL else int(sym.str_value, _TYPE_TO_BASE[sym.orig_type])
+    return (
+        sym.bool_value
+        if sym.orig_type == BOOL
+        else int(sym.str_value, _TYPE_TO_BASE[sym.orig_type])
+    )
 
 
 def _save_old(path):
@@ -6035,7 +6236,9 @@ def _locs(sc):
     # the string. 'sc' is a Symbol or Choice.
 
     if sc.nodes:
-        return "(defined at {})".format(", ".join("{0.filename}:{0.linenr}".format(node) for node in sc.nodes))
+        return "(defined at {})".format(
+            ", ".join("{0.filename}:{0.linenr}".format(node) for node in sc.nodes)
+        )
 
     return "(undefined)"
 
@@ -6062,9 +6265,13 @@ def _expr_depends_on(expr, sym):
         elif left is not sym:
             return False
 
-        return (expr[0] == EQUAL and right is sym.kconfig.y) or (expr[0] == UNEQUAL and right is sym.kconfig.n)
+        return (expr[0] == EQUAL and right is sym.kconfig.y) or (
+            expr[0] == UNEQUAL and right is sym.kconfig.n
+        )
 
-    return expr[0] == AND and (_expr_depends_on(expr[1], sym) or _expr_depends_on(expr[2], sym))
+    return expr[0] == AND and (
+        _expr_depends_on(expr[1], sym) or _expr_depends_on(expr[2], sym)
+    )
 
 
 def _auto_menu_dep(node1, node2):
@@ -6201,7 +6408,11 @@ def _check_dep_loop_sym(sym, ignore_choice):
             #
             # Since we aren't entering the choice via a choice symbol, all
             # choice symbols need to be checked, hence the None.
-            loop = _check_dep_loop_choice(dep, None) if dep.__class__ is Choice else _check_dep_loop_sym(dep, False)
+            loop = (
+                _check_dep_loop_choice(dep, None)
+                if dep.__class__ is Choice
+                else _check_dep_loop_sym(dep, False)
+            )
 
             if loop:
                 # Dependency loop found
@@ -6319,7 +6530,11 @@ def _decoding_error(e, filename, macro_linenr=None):
     raise KconfigError(
         "\nMalformed {} in {}\nContext: {}\nProblematic data: {}\nReason: {}".format(
             e.encoding,
-            f"'{filename}'" if macro_linenr is None else f"output from macro at {filename}:{macro_linenr}",
+            (
+                f"'{filename}'"
+                if macro_linenr is None
+                else f"output from macro at {filename}:{macro_linenr}"
+            ),
             e.object[max(e.start - 40, 0) : e.end + 40],
             e.object[e.start : e.end],
             e.reason,
@@ -6372,7 +6587,9 @@ def _error_if_fn(kconf, _, cond, msg):
 def _shell_fn(kconf, _, command):
     import subprocess  # Only import as needed, to save some startup time
 
-    stdout, stderr = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    stdout, stderr = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
 
     try:
         stdout = stdout.decode(kconf._encoding)

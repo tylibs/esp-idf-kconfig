@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--kconfig", help="KConfig file with config item definitions", required=True)
 
     parser.add_argument(
-        "--sdkconfig-rename",
+        "--tyconfig-rename",
         help="File with deprecated Kconfig options",
         required=False,
     )
@@ -86,25 +86,25 @@ def main():
         env = json.load(args.env_file)
         os.environ.update(env)
 
-    run_server(args.kconfig, args.config, args.sdkconfig_rename)
+    run_server(args.kconfig, args.config, args.tyconfig_rename)
 
 
-def run_server(kconfig, sdkconfig, sdkconfig_rename, default_version=MAX_PROTOCOL_VERSION):
+def run_server(kconfig, tyconfig, tyconfig_rename, default_version=MAX_PROTOCOL_VERSION):
     config = kconfiglib.Kconfig(kconfig)
-    sdkconfig_renames = [sdkconfig_rename] if sdkconfig_rename else []
-    sdkconfig_renames_from_env = os.environ.get("COMPONENT_SDKCONFIG_RENAMES")
-    if sdkconfig_renames_from_env:
-        sdkconfig_renames += sdkconfig_renames_from_env.split(";")
-    deprecated_options = kconfgen.DeprecatedOptions(config.config_prefix, path_rename_files=sdkconfig_renames)
+    tyconfig_renames = [tyconfig_rename] if tyconfig_rename else []
+    tyconfig_renames_from_env = os.environ.get("COMPONENT_TYCONFIG_RENAMES")
+    if tyconfig_renames_from_env:
+        tyconfig_renames += tyconfig_renames_from_env.split(";")
+    deprecated_options = kconfgen.DeprecatedOptions(config.config_prefix, path_rename_files=tyconfig_renames)
     f_o = tempfile.NamedTemporaryFile(mode="w+b", delete=False)
     try:
-        with open(sdkconfig, mode="rb") as f_i:
+        with open(tyconfig, mode="rb") as f_i:
             f_o.write(f_i.read())
         f_o.close()  # need to close as DeprecatedOptions will reopen, and Windows only allows one open file
-        deprecated_options.replace(sdkconfig_in=f_o.name, sdkconfig_out=sdkconfig)
+        deprecated_options.replace(tyconfig_in=f_o.name, tyconfig_out=tyconfig)
     finally:
         os.unlink(f_o.name)
-    config.load_config(sdkconfig)
+    config.load_config(tyconfig)
 
     print("Server running, waiting for requests on stdin...", file=sys.stderr)
 
@@ -149,25 +149,25 @@ def run_server(kconfig, sdkconfig, sdkconfig_rename, default_version=MAX_PROTOCO
         before_ranges = get_ranges(config)
         before_visible = get_visible(config)
 
-        if "load" in req:  # load a new sdkconfig
+        if "load" in req:  # load a new tyconfig
             if req.get("version", default_version) == 1:
-                # for V1 protocol, send all items when loading new sdkconfig.
+                # for V1 protocol, send all items when loading new tyconfig.
                 # (V2+ will only send changes, same as when setting an item)
                 before = {}
                 before_ranges = {}
                 before_visible = {}
 
-            # if no new filename is supplied, use existing sdkconfig path, otherwise update the path
+            # if no new filename is supplied, use existing tyconfig path, otherwise update the path
             if req["load"] is None:
-                req["load"] = sdkconfig
+                req["load"] = tyconfig
             else:
-                sdkconfig = req["load"]
+                tyconfig = req["load"]
 
         if "save" in req:
             if req["save"] is None:
-                req["save"] = sdkconfig
+                req["save"] = tyconfig
             else:
-                sdkconfig = req["save"]
+                tyconfig = req["save"]
 
         error = handle_request(deprecated_options, config, req)
 

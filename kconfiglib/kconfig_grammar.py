@@ -476,7 +476,7 @@ class KconfigGrammar:
         ###########################
         # Comment
         ###########################
-        # Not a #-like comment (which is ignored), but a comment block showed in generated sdkconfig file.
+        # Not a #-like comment (which is ignored), but a comment block showed in generated tyconfig file.
         comment_opts = KconfigOptionBlock().leave_whitespace().set_results_name("comment_opts")
 
         comment = Keyword("comment") + inline_prompt + Opt(comment_opts)

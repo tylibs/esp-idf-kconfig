@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Command line tool to take in ESP-IDF sdkconfig files with project
+# Command line tool to take in ESP-IDF tyconfig files with project
 # settings and output data in multiple formats (update config, generate
 # header file, generate .cmake include file, documentation, etc).
 #
@@ -32,7 +32,7 @@ from esp_idf_kconfig import __version__
 
 
 class DeprecatedOptions(object):
-    _RENAME_FILE_NAME = "sdkconfig.rename"
+    _RENAME_FILE_NAME = "tyconfig.rename"
     _DEP_OP_BEGIN = "# Deprecated options for backward compatibility"
     _DEP_OP_END = "# End of deprecated options"
     _RE_DEP_OP_BEGIN = re.compile(_DEP_OP_BEGIN)
@@ -40,7 +40,7 @@ class DeprecatedOptions(object):
 
     def __init__(self, config_prefix: str, path_rename_files: List[str] = []):
         self.config_prefix = config_prefix
-        # sdkconfig.renames specification: each line contains a pair of config options separated by whitespace(s).
+        # tyconfig.renames specification: each line contains a pair of config options separated by whitespace(s).
         # The first option is the deprecated one, the second one is the new one.
         # The new option can be prefixed with '!' to indicate inversion (n/not set -> y, y -> n).
         self.rename_line_regex = re.compile(
@@ -52,11 +52,13 @@ class DeprecatedOptions(object):
         self.r_dic: Dict[str, str]
         self.rev_r_dic: DefaultDict[str, List]
         self.inversions: List
-        self.r_dic, self.rev_r_dic, self.inversions = self._parse_replacements(path_rename_files)
+        self.r_dic, self.rev_r_dic, self.inversions = self._parse_replacements(
+            path_rename_files
+        )
 
         # note the '=' at the end of regex for not getting partial match of configs.
         # Also match if the config option is followed by a whitespace, this is the case
-        # in sdkconfig.defaults files containing "# CONFIG_MMM_NNN is not set".
+        # in tyconfig.defaults files containing "# CONFIG_MMM_NNN is not set".
         self._RE_CONFIG = re.compile(rf"{self.config_prefix}(\w+)(=|\s+)")
 
     def parse_line(self, line: str) -> Optional[re.Match]:
@@ -82,7 +84,9 @@ class DeprecatedOptions(object):
                 for line_number, line in enumerate(rename_file, start=1):
                     parsed_line = self.parse_line(line)
                     if not parsed_line:
-                        raise RuntimeError(f"Syntax error in {rename_path} (line {line_number})")
+                        raise RuntimeError(
+                            f"Syntax error in {rename_path} (line {line_number})"
+                        )
                     if not parsed_line["old"]:
                         # empty line or comment
                         continue
@@ -129,9 +133,11 @@ class DeprecatedOptions(object):
     def get_new_option(self, deprecated_option: str) -> Optional[str]:
         return self.r_dic.get(deprecated_option, None)
 
-    def replace(self, sdkconfig_in: str, sdkconfig_out: str) -> None:
+    def replace(self, tyconfig_in: str, tyconfig_out: str) -> None:
         replace_enabled = True
-        with open(sdkconfig_in, "r") as input_file, open(sdkconfig_out, "w") as output_file:
+        with open(tyconfig_in, "r") as input_file, open(
+            tyconfig_out, "w"
+        ) as output_file:
             for line_number, line in enumerate(input_file, start=1):
                 if self._RE_DEP_OP_BEGIN.search(line):  # Begin of deprecated options
                     replace_enabled = False
@@ -142,19 +148,28 @@ class DeprecatedOptions(object):
                     if m and m.group(1) in self.r_dic:  # Deprecated option found
                         depr_opt = self.config_prefix + m.group(1)
                         new_opt = self.config_prefix + self.r_dic[m.group(1)]
-                        line = self.replace_line(line, depr_opt=depr_opt, new_opt=new_opt)
+                        line = self.replace_line(
+                            line, depr_opt=depr_opt, new_opt=new_opt
+                        )
                         print(
                             "{}:{} {} was replaced with {} {}".format(
-                                sdkconfig_in,
+                                tyconfig_in,
                                 line_number,
                                 depr_opt,
                                 new_opt,
-                                "and inverted" if depr_opt[len(self.config_prefix) :] in self.inversions else "",
+                                (
+                                    "and inverted"
+                                    if depr_opt[len(self.config_prefix) :]
+                                    in self.inversions
+                                    else ""
+                                ),
                             )
                         )
                 output_file.write(line)
 
-    def replace_line(self, line: str, depr_opt: str, new_opt: str, depr_to_new: bool = True) -> str:
+    def replace_line(
+        self, line: str, depr_opt: str, new_opt: str, depr_to_new: bool = True
+    ) -> str:
         depr_name = self.remove_config_prefix(depr_opt)
         to_replace = depr_opt if depr_to_new else new_opt
         replace_with = new_opt if depr_to_new else depr_opt
@@ -185,18 +200,25 @@ class DeprecatedOptions(object):
             else:
                 try:
                     # otherwise if any of the nodes associated with the option was visible
-                    return any(visibility.visible(node) for node in config.syms[opt].nodes)
+                    return any(
+                        visibility.visible(node) for node in config.syms[opt].nodes
+                    )
                 except KeyError:
                     return False
 
         if len(self.r_dic) > 0:
             with open(path_output, "a") as f_o:
                 header = "Deprecated options and their replacements"
-                f_o.write(".. _configuration-deprecated-options:\n\n{}\n{}\n\n".format(header, "-" * len(header)))
+                f_o.write(
+                    ".. _configuration-deprecated-options:\n\n{}\n{}\n\n".format(
+                        header, "-" * len(header)
+                    )
+                )
                 for dep_opt in sorted(self.r_dic):
                     new_opt = self.r_dic[dep_opt]
                     if option_was_written(new_opt) and (
-                        new_opt not in config.syms or config.syms[new_opt].choice is None
+                        new_opt not in config.syms
+                        or config.syms[new_opt].choice is None
                     ):
                         # everything except config for a choice (no link reference for those in the docs)
                         f_o.write(
@@ -216,7 +238,10 @@ class DeprecatedOptions(object):
                                 if sym.name in self.rev_r_dic:
                                     # only if the symbol has been renamed
                                     dep_names = self.rev_r_dic[sym.name]
-                                    dep_names = [config.config_prefix + name for name in dep_names]
+                                    dep_names = [
+                                        config.config_prefix + name
+                                        for name in dep_names
+                                    ]
                                     # config options doesn't have references
                                     f_o.write("    - {}\n".format(", ".join(dep_names)))
 
@@ -252,7 +277,10 @@ class DeprecatedOptions(object):
         def _opt_defined(opt):
             if opt.orig_type == kconfiglib.BOOL and opt.str_value != "n":
                 opt_defined = True
-            elif opt.orig_type in (kconfiglib.INT, kconfiglib.STRING, kconfiglib.HEX) and opt.str_value != "":
+            elif (
+                opt.orig_type in (kconfiglib.INT, kconfiglib.STRING, kconfiglib.HEX)
+                and opt.str_value != ""
+            ):
                 opt_defined = True
             else:
                 opt_defined = False
@@ -275,7 +303,9 @@ class DeprecatedOptions(object):
                         )
 
 
-def write_config(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str) -> None:
+def write_config(
+    deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str
+) -> None:
     idf_version = os.environ.get("IDF_VERSION", "")
     CONFIG_HEADING = textwrap.dedent(
         f"""\
@@ -343,10 +373,16 @@ def min_config_with_labels(config: kconfiglib.Kconfig, header: str) -> str:
                 # mark the whole path from root as 'used'
                 label_path[label] = True
 
-            if line.strip() == config.comment_default_value:  # indicator that the next config has a default value
+            if (
+                line.strip() == config.comment_default_value
+            ):  # indicator that the next config has a default value
                 config_has_default_value = True
             else:
-                comment_value_is_default = f"{config.comment_default_value}\n" if config_has_default_value else ""
+                comment_value_is_default = (
+                    f"{config.comment_default_value}\n"
+                    if config_has_default_value
+                    else ""
+                )
                 output.append(f"{comment_value_is_default}{line}\n")
                 config_has_default_value = False
         else:
@@ -379,7 +415,9 @@ def write_min_config(_, config: kconfiglib.Kconfig, filename: str) -> None:
         lines = config._min_config_contents(header=CONFIG_HEADING).splitlines()
 
     # convert `# CONFIG_XY is not set` to `CONFIG_XY=n` to improve readability
-    unset_match = re.compile(r"# {}([^ ]+) is not set".format(config.config_prefix)).match
+    unset_match = re.compile(
+        r"# {}([^ ]+) is not set".format(config.config_prefix)
+    ).match
     for idx, line in enumerate(lines):
         match = unset_match(line)
         if match:
@@ -388,7 +426,9 @@ def write_min_config(_, config: kconfiglib.Kconfig, filename: str) -> None:
     config._write_if_changed(filename, "\n".join(lines))
 
 
-def write_header(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str) -> None:
+def write_header(
+    deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str
+) -> None:
     idf_version = os.environ.get("IDF_VERSION", "")
     CONFIG_HEADING = f"""/*
  * Automatically generated file. DO NOT EDIT.
@@ -400,7 +440,9 @@ def write_header(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconf
     deprecated_options.append_header(config, filename)
 
 
-def write_cmake(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str) -> None:
+def write_cmake(
+    deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str
+) -> None:
     with open(filename, "w") as f:
         tmp_dep_list = []
         prefix = config.config_prefix
@@ -435,7 +477,10 @@ def write_cmake(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfi
                 configs_list.append(prefix + sym.name)
                 dep_opts = deprecated_options.get_deprecated_option(sym.name)
                 for opt in dep_opts:
-                    if deprecated_options.is_inversion(opt) and sym.orig_type == kconfiglib.BOOL:
+                    if (
+                        deprecated_options.is_inversion(opt)
+                        and sym.orig_type == kconfiglib.BOOL
+                    ):
                         val = "y" if not val else ""
                     tmp_dep_list.append('set({}{} "{}")\n'.format(prefix, opt, val))
                     configs_list.append(prefix + opt)
@@ -532,7 +577,9 @@ def write_json_menus(_, config: kconfiglib.Kconfig, filename: str) -> None:
 
         try:
             # node.is_menuconfig is True in newer kconfiglibs for menus and choices as well
-            is_menuconfig = node.is_menuconfig and isinstance(node.item, kconfiglib.Symbol)
+            is_menuconfig = node.is_menuconfig and isinstance(
+                node.item, kconfiglib.Symbol
+            )
         except AttributeError:
             is_menuconfig = False
 
@@ -550,7 +597,10 @@ def write_json_menus(_, config: kconfiglib.Kconfig, filename: str) -> None:
                 new_json["help"] = node.help
                 new_json["is_menuconfig"] = is_menuconfig
                 greatest_range = None
-                if isinstance(sym, (kconfiglib.Symbol, kconfiglib.MenuNode)) and len(sym.ranges) > 0:
+                if (
+                    isinstance(sym, (kconfiglib.Symbol, kconfiglib.MenuNode))
+                    and len(sym.ranges) > 0
+                ):
                     # Note: Evaluating the condition using kconfiglib's expr_value
                     # should have one condition which is true
                     for min_range, max_range, cond_expr in sym.ranges:
@@ -612,7 +662,9 @@ def write_json_menus(_, config: kconfiglib.Kconfig, filename: str) -> None:
         f.write(json.dumps(result, sort_keys=True, indent=4))
 
 
-def write_docs(deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str) -> None:
+def write_docs(
+    deprecated_options: DeprecatedOptions, config: kconfiglib.Kconfig, filename: str
+) -> None:
     try:
         target = os.environ["IDF_TARGET"]
     except KeyError:
@@ -655,7 +707,9 @@ def main():
         prog=os.path.basename(sys.argv[0]),
     )
 
-    parser.add_argument("--config", help="Project configuration settings", nargs="?", default=None)
+    parser.add_argument(
+        "--config", help="Project configuration settings", nargs="?", default=None
+    )
 
     parser.add_argument(
         "--defaults",
@@ -666,10 +720,12 @@ def main():
         action="append",
     )
 
-    parser.add_argument("--kconfig", help="KConfig file with config item definitions", required=True)
+    parser.add_argument(
+        "--kconfig", help="KConfig file with config item definitions", required=True
+    )
 
     parser.add_argument(
-        "--sdkconfig-rename",
+        "--tyconfig-rename",
         help="File with deprecated Kconfig options",
         required=False,
     )
@@ -708,19 +764,26 @@ def main():
         "--list-separator",
         choices=["space", "semicolon"],
         default="space",
-        help="Separator used in environment list variables (COMPONENT_SDKCONFIG_RENAMES)",
+        help="Separator used in environment list variables (COMPONENT_TYCONFIG_RENAMES)",
     )
     args = parser.parse_args()
 
     for fmt, filename in args.output:
         if fmt not in OUTPUT_FORMATS.keys():
-            print("Format '%s' not recognised. Known formats: %s" % (fmt, OUTPUT_FORMATS.keys()))
+            print(
+                "Format '%s' not recognised. Known formats: %s"
+                % (fmt, OUTPUT_FORMATS.keys())
+            )
             sys.exit(1)
 
     try:
-        args.env = [(name, value) for (name, value) in (e.split("=", 1) for e in args.env)]
+        args.env = [
+            (name, value) for (name, value) in (e.split("=", 1) for e in args.env)
+        ]
     except ValueError:
-        print("--env arguments must each contain =. To unset an environment variable, use 'ENV='")
+        print(
+            "--env arguments must each contain =. To unset an environment variable, use 'ENV='"
+        )
         sys.exit(1)
 
     for name, value in args.env:
@@ -734,22 +797,30 @@ def main():
     config.warn_assign_redun = False
     config.warn_assign_override = False
 
-    sdkconfig_renames_sep = ";" if args.list_separator == "semicolon" else " "
-    sdkconfig_renames = [args.sdkconfig_rename] if args.sdkconfig_rename else []
-    sdkconfig_renames_from_env = os.environ.get("COMPONENT_SDKCONFIG_RENAMES")
-    if sdkconfig_renames_from_env:
-        sdkconfig_renames += sdkconfig_renames_from_env.split(sdkconfig_renames_sep)
-    deprecated_options = DeprecatedOptions(config.config_prefix, path_rename_files=sdkconfig_renames)
+    tyconfig_renames_sep = ";" if args.list_separator == "semicolon" else " "
+    tyconfig_renames = [args.tyconfig_rename] if args.tyconfig_rename else []
+    tyconfig_renames_from_env = os.environ.get("COMPONENT_TYCONFIG_RENAMES")
+    if tyconfig_renames_from_env:
+        tyconfig_renames += tyconfig_renames_from_env.split(tyconfig_renames_sep)
+    deprecated_options = DeprecatedOptions(
+        config.config_prefix, path_rename_files=tyconfig_renames
+    )
 
     if len(args.defaults) > 0:
 
-        def _replace_empty_assignments(path_in, path_out):  # empty assignment: CONFIG_FOO=
+        def _replace_empty_assignments(
+            path_in, path_out
+        ):  # empty assignment: CONFIG_FOO=
             with open(path_in, "r") as f_in, open(path_out, "w") as f_out:
                 for line_num, line in enumerate(f_in, start=1):
                     line = line.strip()
                     if line.endswith("="):
                         line += "n"
-                        print("{}:{} line was updated to {}".format(path_out, line_num, line))
+                        print(
+                            "{}:{} line was updated to {}".format(
+                                path_out, line_num, line
+                            )
+                        )
                     f_out.write(line)
                     f_out.write("\n")
 
@@ -760,17 +831,23 @@ def main():
             if not os.path.exists(name):
                 raise RuntimeError("Defaults file not found: %s" % name)
             try:
-                with tempfile.NamedTemporaryFile(prefix="kconfgen_tmp", delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    prefix="kconfgen_tmp", delete=False
+                ) as f:
                     temp_file1 = f.name
-                with tempfile.NamedTemporaryFile(prefix="kconfgen_tmp", delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    prefix="kconfgen_tmp", delete=False
+                ) as f:
                     temp_file2 = f.name
-                deprecated_options.replace(sdkconfig_in=name, sdkconfig_out=temp_file1)
+                deprecated_options.replace(tyconfig_in=name, tyconfig_out=temp_file1)
                 _replace_empty_assignments(temp_file1, temp_file2)
                 config.load_config(temp_file2, replace=False)
 
                 for symbol, value in config.missing_syms:
                     if deprecated_options.get_new_option(symbol) is None:
-                        print(f"warning: unknown kconfig symbol '{symbol}' assigned to '{value}' in {name}")
+                        print(
+                            f"warning: unknown kconfig symbol '{symbol}' assigned to '{value}' in {name}"
+                        )
             finally:
                 try:
                     os.remove(temp_file1)
@@ -778,13 +855,13 @@ def main():
                 except OSError:
                     pass
 
-    # If previous sdkconfig file exists, load it
+    # If previous tyconfig file exists, load it
     if args.config and os.path.exists(args.config):
         # ... but replace deprecated options before that
         with tempfile.NamedTemporaryFile(prefix="kconfgen_tmp", delete=False) as f:
             temp_file = f.name
         try:
-            deprecated_options.replace(sdkconfig_in=args.config, sdkconfig_out=temp_file)
+            deprecated_options.replace(tyconfig_in=args.config, tyconfig_out=temp_file)
             config.load_config(temp_file, replace=False)
             update_if_changed(temp_file, args.config)
         finally:

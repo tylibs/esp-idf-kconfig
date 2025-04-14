@@ -321,33 +321,33 @@ class TestReplace(unittest.TestCase):
         self.assertFalse(filecmp.cmp(self.TEST_FILE, self.ORIGINAL))
 
 
-class TestSDKConfigRename(unittest.TestCase):
+class TestTyconfigRename(unittest.TestCase):
     def __init__(self, *args, **kwargs):
-        super(TestSDKConfigRename, self).__init__(*args, **kwargs)
+        super(TestTyconfigRename, self).__init__(*args, **kwargs)
         current_path = os.path.abspath(os.path.dirname(__file__))
-        self.correct_sdkconfigs = os.path.join(current_path, "sdkconfigs", "correct")
-        self.incorrect_sdkconfigs = os.path.join(current_path, "sdkconfigs", "incorrect")
-        self.suggestions = os.path.join(current_path, "sdkconfigs", "suggestions")
+        self.correct_tyconfigs = os.path.join(current_path, "tyconfigs", "correct")
+        self.incorrect_tyconfigs = os.path.join(current_path, "tyconfigs", "incorrect")
+        self.suggestions = os.path.join(current_path, "tyconfigs", "suggestions")
 
-    def test_correct_sdkconfigs(self):
-        correct_files = os.listdir(self.correct_sdkconfigs)
+    def test_correct_tyconfigs(self):
+        correct_files = os.listdir(self.correct_tyconfigs)
         for correct_file in correct_files:
-            is_valid = validate_file(os.path.join(self.correct_sdkconfigs, correct_file))
+            is_valid = validate_file(os.path.join(self.correct_tyconfigs, correct_file))
             self.assertTrue(is_valid)
 
-    def test_incorrect_sdkconfigs(self):
-        incorrect_files = os.listdir(self.incorrect_sdkconfigs)
+    def test_incorrect_tyconfigs(self):
+        incorrect_files = os.listdir(self.incorrect_tyconfigs)
         for incorrect_file in incorrect_files:
-            is_valid = validate_file(os.path.join(self.incorrect_sdkconfigs, incorrect_file))
+            is_valid = validate_file(os.path.join(self.incorrect_tyconfigs, incorrect_file))
             self.assertFalse(is_valid)
             with open(
                 os.path.join(self.suggestions, incorrect_file + ".suggestions"), "r"
             ) as file_expected_suggestions, open(
-                os.path.join(self.incorrect_sdkconfigs, incorrect_file + ".new"), "r"
+                os.path.join(self.incorrect_tyconfigs, incorrect_file + ".new"), "r"
             ) as file_real_suggestion:
                 self.assertEqual(file_expected_suggestions.read(), file_real_suggestion.read())
             try:
-                os.remove(os.path.join(self.incorrect_sdkconfigs, incorrect_file + ".new"))
+                os.remove(os.path.join(self.incorrect_tyconfigs, incorrect_file + ".new"))
             except FileNotFoundError:
                 pass
 
