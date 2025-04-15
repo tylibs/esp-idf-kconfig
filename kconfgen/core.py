@@ -311,7 +311,7 @@ def write_config(
         f"""\
     #
     # Automatically generated file. DO NOT EDIT.
-    # Espressif IoT Development Framework (ESP-IDF) {idf_version} Project Configuration
+    # TYLiBS {idf_version} Project Configuration
     #
     """
     )
@@ -403,7 +403,7 @@ def write_min_config(_, config: kconfiglib.Kconfig, filename: str) -> None:
     CONFIG_HEADING = textwrap.dedent(
         f"""\
     # This file was generated using idf.py save-defconfig. It can be edited manually.
-    # Espressif IoT Development Framework (ESP-IDF) {idf_version} Project Minimal Configuration
+    # TYLiBS {idf_version} Project Minimal Configuration
     #
     {target_symbol.config_string if write_target else ""}\
     """
@@ -432,7 +432,7 @@ def write_header(
     idf_version = os.environ.get("IDF_VERSION", "")
     CONFIG_HEADING = f"""/*
  * Automatically generated file. DO NOT EDIT.
- * Espressif IoT Development Framework (ESP-IDF) {idf_version} Configuration Header
+ * TYLiBS {idf_version} Configuration Header
  */
 #pragma once
 """
@@ -451,7 +451,7 @@ def write_cmake(
             textwrap.dedent(
                 """#
                 # Automatically generated file. DO NOT EDIT.
-                # Espressif IoT Development Framework (ESP-IDF) Configuration cmake include file
+                # TYLiBS Configuration cmake include file
                 #
                 """
             )

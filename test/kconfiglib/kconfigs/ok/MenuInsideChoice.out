@@ -1,6 +1,6 @@
 #
 # Automatically generated file. DO NOT EDIT.
-# Espressif IoT Development Framework (ESP-IDF)  Project Configuration
+# TYLiBS  Project Configuration
 #
 CONFIG_WARP_DRIVE=y
 # CONFIG_SUBLIGHT_DRIVE is not set
